@@ -8,6 +8,8 @@
 #include <signal.h>
 #include <sys/mman.h>
 
+static constexpr char VERSION[] {"0.1"};
+
 static constexpr uint64_t PAGE_SIZE (4096);
 static constexpr int      PATTERN   (0xff);
 
@@ -166,7 +168,7 @@ void setup_argparse(argparse::ArgumentParser& program, int argc, char** argv)
 
 int main(int argc, char** argv)
 {
-    argparse::ArgumentParser program("memtouch");
+    argparse::ArgumentParser program("memtouch", VERSION);
 
     setup_signals();
     setup_argparse(program, argc, argv);
