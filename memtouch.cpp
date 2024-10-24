@@ -122,7 +122,6 @@ void sigint_handler(int s){
     }
 }
 
-
 void setup_signals()
 {
     struct sigaction sigIntHandler;
@@ -172,7 +171,6 @@ int main(int argc, char** argv)
 
     setup_signals();
     setup_argparse(program, argc, argv);
-
 
     auto thread_mem    = program.get<unsigned>("--thread_mem");
     auto num_threads   = program.get<unsigned>("--num_threads");
