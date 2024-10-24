@@ -65,11 +65,13 @@ public:
         }
     }
 
-    void write_page(uint64_t page) {
+    void write_page(uint64_t page)
+    {
         memset(static_cast<char*>(mem_base) + page * PAGE_SIZE, PATTERN, PAGE_SIZE);
     }
 
-    void read_page(uint64_t page, void* buffer) {
+    void read_page(uint64_t page, void* buffer)
+    {
         memcpy(buffer, static_cast<char*>(mem_base) + page * PAGE_SIZE, PAGE_SIZE);
     }
 
@@ -113,7 +115,8 @@ using namespace std;
 vector<WorkerThread> worker_storage;
 vector<unique_ptr<thread>> thread_storage;
 
-void sigint_handler([[maybe_unused]] int s){
+void sigint_handler([[maybe_unused]] int s)
+{
     printf("Terminating...\n");
     for (auto& worker : worker_storage) {
         worker.kill();
