@@ -39,6 +39,8 @@ public:
         while(not terminate) {
             run_loop(num_pages);
         }
+
+        cleanup_memory();
     }
 
     void run_loop(uint64_t num_pages)
@@ -52,6 +54,10 @@ public:
             } else {
                 read_page(actual_page, &read_buffer[0]);
             }
+
+            if (terminate) {
+                break;
+            }
         }
     }
 
@@ -61,6 +67,13 @@ public:
 
     void read_page(uint64_t page, void* buffer) {
         memcpy(buffer, static_cast<char*>(mem_base) + page * PAGE_SIZE, PAGE_SIZE);
+    }
+
+    void cleanup_memory()
+    {
+        if (munmap(mem_base, uint64_t(mem_size_mb) * 1024 * 1024) != 0) {
+            printf("Unable to unmap memory\n");
+        }
     }
 
     bool allocate_memory()
