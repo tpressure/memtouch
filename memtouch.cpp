@@ -30,7 +30,6 @@ public:
         }
 
         uint64_t num_pages {(uint64_t(mem_size_mb) * 1024 * 1024) / PAGE_SIZE};
-        printf("Worker %d executing, touching %ld pages\n", id, num_pages);
 
         // Warmup, write every page
         for (uint64_t page {0}; page < num_pages; ++page) {
@@ -45,10 +44,13 @@ public:
     void run_loop(uint64_t num_pages)
     {
         for (uint64_t page {0}; page < num_pages; ++page) {
+
+            uint64_t actual_page {random ? (rand() % num_pages) : page};
+
             if ((page % 100) >= (100 - rw_ratio)) {
-                write_page(page);
+                write_page(actual_page);
             } else {
-                read_page(page, &read_buffer[0]);
+                read_page(actual_page, &read_buffer[0]);
             }
         }
     }
@@ -168,8 +170,7 @@ int main(int argc, char** argv)
     }
 
     if (random_access) {
-        printf("Random access pattern is not supported yet!\n");
-        return 1;
+        srand(time(nullptr));
     }
 
     printf("Running %u threads touching %u MB of memory\n", num_threads, thread_mem);
