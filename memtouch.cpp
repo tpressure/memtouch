@@ -202,5 +202,8 @@ int main(int argc, char** argv)
         thread_storage[num_thread]->join();
     }
 
+    thread_storage.clear();
+    worker_storage.clear();
+
     return 0;
 }
