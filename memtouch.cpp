@@ -1,10 +1,15 @@
 #include <argparse.hpp>
 
+#include <cstring>
+#include <memory>
 #include <thread>
 #include <vector>
-#include <memory>
 
 #include <signal.h>
+#include <sys/mman.h>
+
+static constexpr uint64_t PAGE_SIZE (4096);
+static constexpr int      PATTERN   (0xff);
 
 class WorkerThread
 {
@@ -15,15 +20,59 @@ public:
         , rw_ratio(rw_ratio_)
         , random(random_)
     {
-        printf("Worker %d created\n", id);
     }
 
     void run()
     {
-        printf("Worker %d executing\n", id);
-        while(not terminate) {
-            asm volatile ("nop");
+        if (not allocate_memory()) {
+            printf("Unable to allocate memory\n");
+            return;
         }
+
+        uint64_t num_pages {(uint64_t(mem_size_mb) * 1024 * 1024) / PAGE_SIZE};
+        printf("Worker %d executing, touching %ld pages\n", id, num_pages);
+
+        // Warmup, write every page
+        for (uint64_t page {0}; page < num_pages; ++page) {
+            write_page(page);
+        }
+
+        while(not terminate) {
+            run_loop(num_pages);
+        }
+    }
+
+    void run_loop(uint64_t num_pages)
+    {
+        for (uint64_t page {0}; page < num_pages; ++page) {
+            if ((page % 100) >= (100 - rw_ratio)) {
+                write_page(page);
+            } else {
+                read_page(page, &read_buffer[0]);
+            }
+        }
+    }
+
+    void write_page(uint64_t page) {
+        memset(static_cast<char*>(mem_base) + page * PAGE_SIZE, PATTERN, PAGE_SIZE);
+    }
+
+    void read_page(uint64_t page, void* buffer) {
+        memcpy(buffer, static_cast<char*>(mem_base) + page * PAGE_SIZE, PAGE_SIZE);
+    }
+
+    bool allocate_memory()
+    {
+        mem_base = mmap(NULL, uint64_t(mem_size_mb) * 1024 * 1024,
+                        PROT_READ | PROT_WRITE,
+                        MAP_PRIVATE | MAP_ANONYMOUS,
+                        -1, 0);
+
+        if (mem_base == MAP_FAILED) {
+            return false;
+        }
+
+        return true;
     }
 
     void kill()
@@ -38,6 +87,10 @@ private:
     bool random;
 
     bool terminate {false};
+
+    void* mem_base {nullptr};
+
+    char read_buffer[PAGE_SIZE];
 };
 
 using namespace std;
@@ -46,7 +99,7 @@ vector<WorkerThread> worker_storage;
 vector<unique_ptr<thread>> thread_storage;
 
 void sigint_handler(int s){
-    printf("Terminating...");
+    printf("Terminating...\n");
     for (auto& worker : worker_storage) {
         worker.kill();
     }
@@ -108,6 +161,16 @@ int main(int argc, char** argv)
     auto num_threads   = program.get<unsigned>("--num_threads");
     auto rw_ratio      = program.get<unsigned>("--rw_ratio");
     auto random_access = program.get<bool>("--random");
+
+    if (rw_ratio > 100) {
+        printf("Invalid rw_ratio, range is 0 to 100\n");
+        return 1;
+    }
+
+    if (random_access) {
+        printf("Random access pattern is not supported yet!\n");
+        return 1;
+    }
 
     printf("Running %u threads touching %u MB of memory\n", num_threads, thread_mem);
     printf("    access pattern: %s\n", random_access ? "random" : "sequential");
