@@ -15,14 +15,19 @@
 static constexpr uint64_t PAGE_SIZE (4096);
 static constexpr int      PATTERN   (0xff);
 
+static constexpr int DEFAULT_STAT_IVAL (60);
+
 class WorkerThread
 {
 public:
-    WorkerThread(unsigned id_, unsigned mem_size_mb_, unsigned rw_ratio_, bool random_)
+    WorkerThread(unsigned id_, unsigned mem_size_mb_,
+                 unsigned rw_ratio_, bool random_,
+                 bool collect_stats_)
         : id(id_)
         , mem_size_mb(mem_size_mb_)
         , rw_ratio(rw_ratio_)
         , random(random_)
+        , collect_stats(collect_stats_)
     {
     }
 
@@ -104,6 +109,7 @@ private:
     bool random;
 
     bool terminate {false};
+    bool collect_stats {false};
 
     void* mem_base {nullptr};
 
@@ -152,9 +158,16 @@ void setup_argparse(argparse::ArgumentParser& program, int argc, char** argv)
         .scan<'u', unsigned>();
 
     program.add_argument("--random")
-        .help("use random access pattern for memory access (default is false)")
+        .help("use random access pattern for memory access [default: false]")
         .default_value(false)
         .implicit_value(true);
+
+    program.add_argument("--stat_file")
+        .help("filepath where statistics are logged");
+
+    program.add_argument("--stat_ival")
+        .help("interval for statistics logging")
+        .scan<'u', unsigned>();
 
     try {
         program.parse_args(argc, argv);
@@ -178,6 +191,23 @@ int main(int argc, char** argv)
     auto rw_ratio      = program.get<unsigned>("--rw_ratio");
     auto random_access = program.get<bool>("--random");
 
+    std::string stats_file;
+    unsigned stats_ival;
+
+    bool stats_requested {false};
+
+    try {
+        stats_file = program.get<std::string>("--stat_file");
+        stats_requested = true;
+    } catch (const std::exception& err) {
+    }
+
+    try {
+        stats_ival = program.get<unsigned>("--stat_ival");
+    } catch (const std::exception& err) {
+        stats_ival = DEFAULT_STAT_IVAL;
+    }
+
     if (rw_ratio > 100) {
         printf("Invalid rw_ratio, range is 0 to 100\n");
         return 1;
@@ -189,14 +219,19 @@ int main(int argc, char** argv)
     }
 
     printf("Running %u threads touching %u MB of memory\n", num_threads, thread_mem);
-    printf("    access pattern: %s\n", random_access ? "random" : "sequential");
-    printf("    r/w ratio     : %u\n", rw_ratio);
+    printf("    access pattern     : %s\n", random_access ? "random" : "sequential");
+    printf("    r/w ratio          : %u\n", rw_ratio);
+
+    if (stats_requested) {
+        printf("    statistics file    : %s\n", stats_file.data());
+        printf("    statistics interval: %u\n", stats_ival);
+    }
 
     worker_storage.reserve(num_threads);
     thread_storage.reserve(num_threads);
 
     for (unsigned num_thread = 0; num_thread < num_threads; num_thread++) {
-        worker_storage.emplace_back(num_thread, thread_mem, rw_ratio, random_access);
+        worker_storage.emplace_back(num_thread, thread_mem, rw_ratio, random_access, stats_requested);
         thread_storage.emplace_back(std::move(make_unique<thread>(&WorkerThread::run, &worker_storage.back())));
     }
 
