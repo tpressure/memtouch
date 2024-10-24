@@ -4,10 +4,16 @@
 #include <vector>
 #include <memory>
 
+#include <signal.h>
+
 class WorkerThread
 {
 public:
-    WorkerThread(unsigned id_) : id(id_)
+    WorkerThread(unsigned id_, unsigned mem_size_mb_, unsigned rw_ratio_, bool random_)
+        : id(id_)
+        , mem_size_mb(mem_size_mb_)
+        , rw_ratio(rw_ratio_)
+        , random(random_)
     {
         printf("Worker %d created\n", id);
     }
@@ -15,24 +21,56 @@ public:
     void run()
     {
         printf("Worker %d executing\n", id);
+        while(not terminate) {
+            asm volatile ("nop");
+        }
     }
+
+    void kill()
+    {
+        terminate = true;
+    }
+
 private:
     unsigned id;
+    unsigned mem_size_mb;
+    unsigned rw_ratio;
+    bool random;
+
+    bool terminate {false};
 };
 
 using namespace std;
 
+vector<WorkerThread> worker_storage;
+vector<unique_ptr<thread>> thread_storage;
+
+void sigint_handler(int s){
+    printf("Terminating...");
+    for (auto& worker : worker_storage) {
+        worker.kill();
+    }
+}
+
 int main(int argc, char** argv)
 {
-    vector<WorkerThread> worker_storage;
-    vector<unique_ptr<thread>> thread_storage;
-    argparse::ArgumentParser program("program_name");
+    struct sigaction sigIntHandler;
+
+    sigIntHandler.sa_handler = sigint_handler;
+    sigemptyset(&sigIntHandler.sa_mask);
+    sigIntHandler.sa_flags = 0;
+
+    sigaction(SIGINT, &sigIntHandler, NULL);
+
+    argparse::ArgumentParser program("memtouch");
 
     program.add_argument("--thread_mem")
+        .required()
         .help("amount of memory a thread touches in MB")
         .scan<'u', unsigned>();
 
     program.add_argument("--num_threads")
+        .required()
         .help("number of worker threads")
         .scan<'u', unsigned>();
 
@@ -42,6 +80,7 @@ int main(int argc, char** argv)
         .implicit_value(true);
 
     program.add_argument("--rw_ratio")
+        .required()
         .help("read/write ratio where 0 means only reads and 100 only writes")
         .scan<'u', unsigned>();
 
@@ -67,7 +106,7 @@ int main(int argc, char** argv)
     thread_storage.reserve(num_threads);
 
     for (unsigned num_thread = 0; num_thread < num_threads; num_thread++) {
-        worker_storage.emplace_back(num_thread);
+        worker_storage.emplace_back(num_thread, thread_mem, rw_ratio, random_access);
         thread_storage.emplace_back(std::move(make_unique<thread>(&WorkerThread::run, &worker_storage.back())));
     }
 
