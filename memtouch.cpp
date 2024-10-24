@@ -146,15 +146,15 @@ void setup_argparse(argparse::ArgumentParser& program, int argc, char** argv)
         .help("number of worker threads")
         .scan<'u', unsigned>();
 
-    program.add_argument("--random")
-        .help("use random access pattern for memory access (default is false)")
-        .default_value(false)
-        .implicit_value(true);
-
     program.add_argument("--rw_ratio")
         .required()
         .help("read/write ratio where 0 means only reads and 100 only writes")
         .scan<'u', unsigned>();
+
+    program.add_argument("--random")
+        .help("use random access pattern for memory access (default is false)")
+        .default_value(false)
+        .implicit_value(true);
 
     try {
         program.parse_args(argc, argv);
