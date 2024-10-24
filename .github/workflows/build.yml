@@ -1,0 +1,45 @@
+name: Build
+
+on:
+  merge_group:
+  pull_request:
+  push:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build_regular:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: 'true'
+      - name: build
+        run: make
+      - name: test
+        run: ./memtouch --help
+
+  build_nix_shell:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: 'true'
+      - uses: cachix/install-nix-action@V27
+      - uses: DeterminateSystems/magic-nix-cache-action@main
+      - name: build
+        run: nix develop -i --command bash -c "make"
+      - name: test
+        run: nix develop -i --command bash -c "./memtouch --help"
+
+  build_nix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: cachix/install-nix-action@V27
+      - uses: DeterminateSystems/magic-nix-cache-action@main
+      - name: nix build
+        run: nix build .
+      - name: nix test
+        run: nix run . -- --help
