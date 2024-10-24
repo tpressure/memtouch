@@ -52,7 +52,8 @@ void sigint_handler(int s){
     }
 }
 
-int main(int argc, char** argv)
+
+void setup_signals()
 {
     struct sigaction sigIntHandler;
 
@@ -61,9 +62,10 @@ int main(int argc, char** argv)
     sigIntHandler.sa_flags = 0;
 
     sigaction(SIGINT, &sigIntHandler, NULL);
+}
 
-    argparse::ArgumentParser program("memtouch");
-
+void setup_argparse(argparse::ArgumentParser& program, int argc, char** argv)
+{
     program.add_argument("--thread_mem")
         .required()
         .help("amount of memory a thread touches in MB")
@@ -90,8 +92,17 @@ int main(int argc, char** argv)
     catch (const std::exception& err) {
         std::cerr << err.what() << std::endl;
         std::cerr << program;
-        return 1;
+        exit(1);
     }
+}
+
+int main(int argc, char** argv)
+{
+    argparse::ArgumentParser program("memtouch");
+
+    setup_signals();
+    setup_argparse(program, argc, argv);
+
 
     auto thread_mem    = program.get<unsigned>("--thread_mem");
     auto num_threads   = program.get<unsigned>("--num_threads");
