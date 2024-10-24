@@ -1,7 +1,23 @@
-# How to use
+# About
 
-`git submodule update --init`
+Simple but configurable memory stresstest for UNIX-like systems.
 
-`make`
+# How to Use and Build
 
-`./memtouch --help`
+## Nix Toolchain
+
+```bash
+git checkout <this repo>
+nix build .
+nix run . -- <args> # e.g.: nix run -- --help
+```
+
+## Regular Toolchain
+
+```bash
+git checkout <this repo>
+git submodule update --init
+make
+./memtouch --help
+```
+
