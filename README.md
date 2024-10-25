@@ -21,3 +21,12 @@ meson setup build
 ninja -C build
 ./build/memtouch --help
 ```
+
+## Code Formatting 
+
+Format the files in place:
+
+```bash
+meson setup build # optional 
+ninja -C build clang-format
+```
