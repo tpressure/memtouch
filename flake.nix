@@ -18,10 +18,8 @@
     in
     {
       devShells.x86_64-linux.default = pkgs.mkShell {
+        inputsFrom = [ self.packages.x86_64-linux.memtouch ];
         packages = with pkgs; [
-          gcc
-          git
-          gnumake
           nixfmt-rfc-style
         ];
       };
