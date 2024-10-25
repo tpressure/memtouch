@@ -38,6 +38,7 @@ cpp_flags = [
   '-fvisibility=hidden', # Hide non-API symbols
   '-ffunction-sections', '-fdata-sections', # Allow garbage collection of unused code/data
   '-march=native', # Tune for host machine architecture
+  '-DPROJECT_VERSION="' + meson.project_version() + '"'
 ]
 
 # Linker flags
