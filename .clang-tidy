@@ -1,0 +1,12 @@
+# The presence of this file let meson generates a `clang-tidy` target.
+
+# Quick & dirty solution to only run on the .cpp file.
+HeaderFilterRegex: '-'
+
+Checks:
+  - 'bugprone-*'          # Checks for potential bugs
+  - 'performance-*'       # Performance-related checks
+  - 'modernize-*'         # Suggestions to modernize C++ code
+  - 'readability-*'       # Readability improvements
+  - 'cppcoreguidelines-*' # Core guidelines for C++ code
+  - 'misc-*'              # Miscellaneous checks

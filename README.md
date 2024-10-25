@@ -21,3 +21,8 @@ meson setup build
 ninja -C build
 ./build/memtouch --help
 ```
+
+# Lint
+```bash
+ninja -C build clang-tidy
+```
