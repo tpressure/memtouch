@@ -54,19 +54,24 @@ public:
 
     void run_loop(uint64_t num_pages)
     {
-        for (uint64_t page {0}; page < num_pages; ++page) {
+        uint64_t pages_to_read  {num_pages};
+        uint64_t pages_to_write {0};
+
+        if (rw_ratio) {
+            pages_to_read  = (num_pages * rw_ratio) / 100;
+            pages_to_write = num_pages - pages_to_read;
+        }
+
+        for (uint64_t page {0}; page < pages_to_read; ++page) {
             auto random_value = static_cast<uint64_t>(rand());
             uint64_t actual_page {random ? (random_value % num_pages) : page};
+            read_page(actual_page, &read_buffer[0]);
+        }
 
-            if ((page % 100) >= (100 - rw_ratio)) {
-                write_page(actual_page);
-            } else {
-                read_page(actual_page, &read_buffer[0]);
-            }
-
-            if (terminate) {
-                break;
-            }
+        for (uint64_t page {0}; page < pages_to_write; ++page) {
+            auto random_value = static_cast<uint64_t>(rand());
+            uint64_t actual_page {random ? (random_value % num_pages) : page};
+            write_page(actual_page);
         }
     }
 
@@ -116,10 +121,24 @@ private:
     char read_buffer[PAGE_SIZE];
 };
 
+struct Statistics
+{
+    Statistics() = default;
+
+    Statistics(Statistics&& o) {
+        write_rate.store(o.write_rate.load());
+        read_rate.store(o.read_rate.load());
+    }
+
+    std::atomic<uint64_t> read_rate {0};
+    std::atomic<uint64_t> write_rate {0};
+};
+
 using namespace std;
 
 vector<WorkerThread> worker_storage;
 vector<unique_ptr<thread>> thread_storage;
+vector<Statistics> stat_storage;
 
 void sigint_handler([[maybe_unused]] int s)
 {
@@ -230,6 +249,8 @@ int main(int argc, char** argv)
     worker_storage.reserve(num_threads);
     thread_storage.reserve(num_threads);
 
+    stat_storage.reserve(num_threads);
+
     for (unsigned num_thread = 0; num_thread < num_threads; num_thread++) {
         worker_storage.emplace_back(num_thread, thread_mem, rw_ratio, random_access, stats_requested);
         thread_storage.emplace_back(std::move(make_unique<thread>(&WorkerThread::run, &worker_storage.back())));
@@ -241,6 +262,7 @@ int main(int argc, char** argv)
 
     thread_storage.clear();
     worker_storage.clear();
+    stat_storage.clear();
 
     return 0;
 }
