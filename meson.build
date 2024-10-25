@@ -65,3 +65,11 @@ executable(
   cpp_args : cpp_flags,
   link_args : linker_flags
 )
+
+# Custom target for clang-format check
+clang_format_check_target = custom_target(
+  'clang-format-check',
+  output: [ 'clang-format-check.txt' ],
+  command: ['clang-format', '--dry-run', '-Werror', 'memtouch.cpp'],
+  build_always: true
+)

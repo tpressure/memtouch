@@ -22,6 +22,17 @@ jobs:
       - name: test
         run: ./build/memtouch --help
 
+  check-clang-format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: 'true'
+      - name: install prerequisites
+        run: sudo apt-get update && sudo apt-get install -y meson ninja-build clang-format
+      - name: check
+        run: meson setup build && ninja -C build clang-format-check
+
   build_nix_shell:
     runs-on: ubuntu-latest
     steps:

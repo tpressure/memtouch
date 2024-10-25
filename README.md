@@ -24,6 +24,14 @@ ninja -C build
 
 ## Code Formatting 
 
+Check the files:
+
+```bash
+meson setup build # optional 
+ninja -C build clang-format-check
+```
+
+
 Format the files in place:
 
 ```bash
