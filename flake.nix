@@ -20,7 +20,6 @@
       devShells.x86_64-linux.default = pkgs.mkShell {
         inputsFrom = [ self.packages.x86_64-linux.memtouch ];
         packages = with pkgs; [
-          llvmPackages.clang-tools # clang-ridy
           nixfmt-rfc-style
         ];
       };
