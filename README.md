@@ -17,6 +17,7 @@ nix run . -- <args> # e.g.: nix run -- --help
 ```bash
 git checkout <this repo>
 git submodule update --init
-make
-./memtouch --help
+meson setup build
+ninja -C build
+./build/memtouch --help
 ```

@@ -38,8 +38,9 @@
               mkdir -p contrib/argparse
               cp -r ${argparse}/. contrib/argparse
             '';
-            makeFlags = [
-              "DESTDIR=$(out)"
+            nativeBuildInputs = with pkgs; [
+              meson
+              ninja
             ];
           };
         in
