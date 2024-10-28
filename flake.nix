@@ -30,7 +30,19 @@
         let
           memtouch = pkgs.stdenv.mkDerivation {
             name = "memtouch";
-            version = "0.1.0";
+            version =
+              # Read version from meson project.
+              let
+                mesonFile = builtins.readFile ./meson.build;
+                lines' = builtins.split "\n" mesonFile;
+                # Skip non-relevant items of interleaved list.
+                lines = builtins.filter (e: builtins.typeOf e == "string") lines';
+                versionLines = builtins.filter (line: builtins.match ".*version: '.*" line != null) lines;
+                versionLine = builtins.head versionLines;
+                matches = builtins.match ".*([0-9]\.[0-9]\.[0-9]).*" versionLine;
+                version = builtins.head matches;
+              in
+              version;
             src = pkgs.nix-gitignore.gitignoreSource [ ] ./.;
             # TODO fetching the git submodule could probably also be done
             # more naturally.
@@ -38,8 +50,9 @@
               mkdir -p contrib/argparse
               cp -r ${argparse}/. contrib/argparse
             '';
-            makeFlags = [
-              "DESTDIR=$(out)"
+            nativeBuildInputs = with pkgs; [
+              meson
+              ninja
             ];
           };
         in

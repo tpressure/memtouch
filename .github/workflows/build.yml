@@ -15,10 +15,12 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: 'true'
+      - name: install prerequisites
+        run: sudo apt-get update && sudo apt-get install -y meson ninja-build
       - name: build
-        run: make
+        run: meson setup build && ninja -C build
       - name: test
-        run: ./memtouch --help
+        run: ./build/memtouch --help
 
   build_nix_shell:
     runs-on: ubuntu-latest
@@ -29,9 +31,9 @@ jobs:
       - uses: cachix/install-nix-action@v30
       - uses: DeterminateSystems/magic-nix-cache-action@main
       - name: build
-        run: nix develop -i --command bash -c "make"
+        run: nix develop -i --command bash -c "meson setup build && ninja -C build"
       - name: test
-        run: nix develop -i --command bash -c "./memtouch --help"
+        run: nix develop -i --command bash -c "./build/memtouch --help"
 
   build_nix:
     runs-on: ubuntu-latest

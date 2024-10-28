@@ -8,7 +8,9 @@
 #include <signal.h>
 #include <sys/mman.h>
 
-static constexpr char VERSION[] {"0.1"};
+#ifndef PROJECT_VERSION
+#define PROJECT_VERSION "0.0.0"
+#endif
 
 static constexpr uint64_t PAGE_SIZE (4096);
 static constexpr int      PATTERN   (0xff);
@@ -48,8 +50,8 @@ public:
     void run_loop(uint64_t num_pages)
     {
         for (uint64_t page {0}; page < num_pages; ++page) {
-
-            uint64_t actual_page {random ? (rand() % num_pages) : page};
+            auto random_value = static_cast<uint64_t>(rand());
+            uint64_t actual_page {random ? (random_value % num_pages) : page};
 
             if ((page % 100) >= (100 - rw_ratio)) {
                 write_page(actual_page);
@@ -85,11 +87,7 @@ public:
                         MAP_PRIVATE | MAP_ANONYMOUS,
                         -1, 0);
 
-        if (mem_base == MAP_FAILED) {
-            return false;
-        }
-
-        return true;
+        return mem_base != MAP_FAILED;
     }
 
     void kill()
@@ -115,7 +113,7 @@ using namespace std;
 vector<WorkerThread> worker_storage;
 vector<unique_ptr<thread>> thread_storage;
 
-void sigint_handler(int s){
+void sigint_handler([[maybe_unused]] int s){
     printf("Terminating...\n");
     for (auto& worker : worker_storage) {
         worker.kill();
@@ -167,7 +165,7 @@ void setup_argparse(argparse::ArgumentParser& program, int argc, char** argv)
 
 int main(int argc, char** argv)
 {
-    argparse::ArgumentParser program("memtouch", VERSION);
+    argparse::ArgumentParser program("memtouch", PROJECT_VERSION);
 
     setup_signals();
     setup_argparse(program, argc, argv);
@@ -183,7 +181,8 @@ int main(int argc, char** argv)
     }
 
     if (random_access) {
-        srand(time(nullptr));
+        auto seed = static_cast<unsigned int>(time(nullptr));
+        srand(seed);
     }
 
     printf("Running %u threads touching %u MB of memory\n", num_threads, thread_mem);
