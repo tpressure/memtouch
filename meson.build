@@ -9,7 +9,7 @@ project(
     'warning_level=3', # roughly: -Wall -Wextra -Wpedantic
     'b_pie=true', # Enables Position Independent Executable (PIE)
     'b_lto=true', # Enables Link Time Optimization (LTO)
-    'optimization=3'
+    'optimization=2'
   ]
 )
 
