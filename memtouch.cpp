@@ -326,7 +326,9 @@ int main(int argc, char** argv)
         thread_storage.emplace_back(std::move(make_unique<thread>(&WorkerThread::run, &worker_storage.back())));
     }
 
-    thread_storage.emplace_back(std::move(make_unique<thread>(&StatisticsThread::run, &stat_thread)));
+    if (stats_requested) {
+        thread_storage.emplace_back(std::move(make_unique<thread>(&StatisticsThread::run, &stat_thread)));
+    }
 
     for (auto& t : thread_storage) {
         t->join();
