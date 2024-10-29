@@ -1,6 +1,8 @@
 #include <argparse.hpp>
 
+#include <chrono>
 #include <cstring>
+#include <format>
 #include <functional>
 #include <memory>
 #include <thread>
@@ -16,7 +18,9 @@
 static constexpr uint64_t PAGE_SIZE (4096);
 static constexpr int      PATTERN   (0xff);
 
-static constexpr int DEFAULT_STAT_IVAL (60);
+static constexpr int DEFAULT_STAT_IVAL (1000);
+
+using namespace std;
 
 struct Statistics
 {
@@ -68,11 +72,11 @@ public:
     }
 
     int64_t measure_time(std::function<void()> func) {
-        const auto time_start {std::chrono::system_clock::now()};
+        const auto time_start {chrono::system_clock::now()};
         func();
-        const auto time_end {std::chrono::system_clock::now()};
+        const auto time_end {chrono::system_clock::now()};
 
-        const auto time_needed {std::chrono::duration_cast<std::chrono::milliseconds>(time_end - time_start)};
+        const auto time_needed {chrono::duration_cast<chrono::milliseconds>(time_end - time_start)};
 
         return time_needed.count();
     }
@@ -170,8 +174,6 @@ private:
     Statistics stats;
 };
 
-using namespace std;
-
 class StatisticsThread
 {
 public:
@@ -190,8 +192,8 @@ public:
                 write_rate += worker.write_rate();
             }
 
-            printf("read:%.1f write:%.1f\n", read_rate, write_rate);
-            sleep(1);
+            printf("[%s] read:%.1f write:%.1f\n", get_iso8601_time().c_str(), read_rate, write_rate);
+            usleep(uint64_t(logging_ival_ms) * 1000);
         }
     }
 
@@ -200,10 +202,31 @@ public:
         terminate = true;
     }
 
+    void set_interval(unsigned ival_ms)
+    {
+        logging_ival_ms = ival_ms;
+    }
+
+    string get_iso8601_time()
+    {
+        const auto now         {chrono::system_clock::now()};
+        const auto now_as_time {chrono::system_clock::to_time_t(now)};
+        const auto now_ms      {chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()) % 1000};
+
+        std::stringstream s;
+
+        s << std::put_time(std::localtime(&now_as_time), "%FT%T")
+          << '.' << std::setfill('0') << std::setw(3) << now_ms.count()
+          << put_time(localtime(&now_as_time), "%z");
+
+        return s.str();
+    }
+
 private:
     vector<WorkerThread>& workers;
 
     bool terminate {false};
+    unsigned logging_ival_ms {DEFAULT_STAT_IVAL};
 };
 
 vector<WorkerThread> worker_storage;
@@ -328,6 +351,7 @@ int main(int argc, char** argv)
 
     if (stats_requested) {
         thread_storage.emplace_back(std::move(make_unique<thread>(&StatisticsThread::run, &stat_thread)));
+        stat_thread.set_interval(stats_ival);
     }
 
     for (auto& t : thread_storage) {
