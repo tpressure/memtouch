@@ -333,6 +333,7 @@ int main(int argc, char** argv)
     }
 
     printf("Running %u threads touching %u MB of memory\n", num_threads, thread_mem);
+    printf("    memory consumption : %d MB\n", num_threads * thread_mem);
     printf("    access pattern     : %s\n", random_access ? "random" : "sequential");
     printf("    r/w ratio          : %u\n", rw_ratio);
 
