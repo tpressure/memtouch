@@ -182,17 +182,31 @@ public:
     {
     }
 
+    ~StatisticsThread()
+    {
+        if (logging_enabled) {
+            log_file.close();
+        }
+    }
+
     void run()
     {
         while (not terminate) {
             float read_rate  {0};
             float write_rate {0};
+
             for (auto& worker : workers) {
                 read_rate  += worker.read_rate();
                 write_rate += worker.write_rate();
             }
 
-            printf("[%s] read:%.1f write:%.1f\n", get_iso8601_time().c_str(), read_rate, write_rate);
+            if (logging_enabled) {
+                log_file << setprecision(2) << setfill('0')
+                         << get_iso8601_time() << " read:"
+                         << fixed << read_rate << " write:"
+                         << fixed << write_rate << "\n";
+            }
+
             usleep(uint64_t(logging_ival_ms) * 1000);
         }
     }
@@ -222,11 +236,20 @@ public:
         return s.str();
     }
 
+    void set_log_file(string file_path)
+    {
+        log_file.open(file_path);
+        logging_enabled = true;
+    }
+
 private:
     vector<WorkerThread>& workers;
 
     bool terminate {false};
     unsigned logging_ival_ms {DEFAULT_STAT_IVAL};
+
+    ofstream log_file {};
+    bool logging_enabled {false};
 };
 
 vector<WorkerThread> worker_storage;
@@ -272,7 +295,7 @@ void setup_argparse(argparse::ArgumentParser& program, int argc, char** argv)
         .scan<'u', unsigned>();
 
     program.add_argument("--random")
-        .help("use random access pattern for memory access [default: false]")
+        .help("use random access pattern for (virtual) memory access [default: false]")
         .default_value(false)
         .implicit_value(true);
 
@@ -340,6 +363,9 @@ int main(int argc, char** argv)
     if (stats_requested) {
         printf("    statistics file    : %s\n", stats_file.data());
         printf("    statistics interval: %u ms\n", stats_ival);
+
+        stat_thread.set_interval(stats_ival);
+        stat_thread.set_log_file(stats_file.data());
     }
 
     worker_storage.reserve(num_threads);
@@ -352,7 +378,6 @@ int main(int argc, char** argv)
 
     if (stats_requested) {
         thread_storage.emplace_back(std::move(make_unique<thread>(&StatisticsThread::run, &stat_thread)));
-        stat_thread.set_interval(stats_ival);
     }
 
     for (auto& t : thread_storage) {
