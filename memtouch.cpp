@@ -339,7 +339,7 @@ int main(int argc, char** argv)
 
     if (stats_requested) {
         printf("    statistics file    : %s\n", stats_file.data());
-        printf("    statistics interval: %u\n", stats_ival);
+        printf("    statistics interval: %u ms\n", stats_ival);
     }
 
     worker_storage.reserve(num_threads);
