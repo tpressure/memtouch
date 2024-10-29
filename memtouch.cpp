@@ -280,7 +280,7 @@ void setup_argparse(argparse::ArgumentParser& program, int argc, char** argv)
         .help("filepath where statistics are logged");
 
     program.add_argument("--stat_ival")
-        .help("interval for statistics logging")
+        .help("interval for statistics logging in ms")
         .scan<'u', unsigned>();
 
     try {
