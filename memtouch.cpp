@@ -39,12 +39,10 @@ class WorkerThread
 {
 public:
     WorkerThread(unsigned id_, unsigned mem_size_mb_,
-                 unsigned rw_ratio_, bool random_,
-                 bool collect_stats_)
+                 unsigned rw_ratio_, bool collect_stats_)
         : id(id_)
         , mem_size_mb(mem_size_mb_)
         , rw_ratio(rw_ratio_)
-        , random(random_)
         , collect_stats(collect_stats_)
         , stats()
     {
@@ -93,17 +91,13 @@ public:
 
         auto time_read = measure_time([&]() {
             for (uint64_t page {0}; page < pages_to_read; ++page) {
-                auto random_value = static_cast<uint64_t>(rand());
-                uint64_t actual_page {random ? (random_value % num_pages) : page};
-                read_page(actual_page, &read_buffer[0]);
+                read_page(page, &read_buffer[0]);
             }
         });
 
         auto time_write = measure_time([&]() {
             for (uint64_t page {pages_to_read}; page < num_pages; ++page) {
-                auto random_value = static_cast<uint64_t>(rand());
-                uint64_t actual_page {random ? (random_value % num_pages) : page};
-                write_page(actual_page);
+                write_page(page);
             }
         });
 
@@ -162,7 +156,6 @@ private:
     unsigned id;
     unsigned mem_size_mb;
     unsigned rw_ratio;
-    bool random;
 
     bool terminate {false};
     bool collect_stats {false};
@@ -201,11 +194,11 @@ public:
             }
 
             if (logging_enabled) {
-                cout << setprecision(2) << setfill('0')
+                log_file << setprecision(2) << setfill('0')
                          << get_iso8601_time() << " read:"
                          << fixed << read_rate << " write:"
                          << fixed << write_rate << "\n";
-                cout.flush();
+                log_file.flush();
             }
 
             usleep(uint64_t(logging_ival_ms) * 1000);
@@ -295,11 +288,6 @@ void setup_argparse(argparse::ArgumentParser& program, int argc, char** argv)
         .help("read/write ratio where 0 means only reads and 100 only writes")
         .scan<'u', unsigned>();
 
-    program.add_argument("--random")
-        .help("use random access pattern for (virtual) memory access [default: false]")
-        .default_value(false)
-        .implicit_value(true);
-
     program.add_argument("--stat_file")
         .help("filepath where statistics are logged");
 
@@ -327,7 +315,6 @@ int main(int argc, char** argv)
     auto thread_mem    = program.get<unsigned>("--thread_mem");
     auto num_threads   = program.get<unsigned>("--num_threads");
     auto rw_ratio      = program.get<unsigned>("--rw_ratio");
-    auto random_access = program.get<bool>("--random");
 
     std::string stats_file;
     unsigned stats_ival;
@@ -351,14 +338,8 @@ int main(int argc, char** argv)
         return 1;
     }
 
-    if (random_access) {
-        auto seed = static_cast<unsigned int>(time(nullptr));
-        srand(seed);
-    }
-
     printf("Running %u threads touching %u MB of memory\n", num_threads, thread_mem);
     printf("    memory consumption : %d MB\n", num_threads * thread_mem);
-    printf("    access pattern     : %s\n", random_access ? "random" : "sequential");
     printf("    r/w ratio          : %u\n", rw_ratio);
 
     if (stats_requested) {
@@ -373,7 +354,7 @@ int main(int argc, char** argv)
     thread_storage.reserve(num_threads + 1 /* statistics thread */);
 
     for (unsigned num_thread = 0; num_thread < num_threads; num_thread++) {
-        worker_storage.emplace_back(num_thread, thread_mem, rw_ratio, random_access, stats_requested);
+        worker_storage.emplace_back(num_thread, thread_mem, rw_ratio, stats_requested);
         thread_storage.emplace_back(std::move(make_unique<thread>(&WorkerThread::run, &worker_storage.back())));
     }
 
