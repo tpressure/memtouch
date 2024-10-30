@@ -201,10 +201,11 @@ public:
             }
 
             if (logging_enabled) {
-                log_file << setprecision(2) << setfill('0')
+                cout << setprecision(2) << setfill('0')
                          << get_iso8601_time() << " read:"
                          << fixed << read_rate << " write:"
                          << fixed << write_rate << "\n";
+                cout.flush();
             }
 
             usleep(uint64_t(logging_ival_ms) * 1000);
