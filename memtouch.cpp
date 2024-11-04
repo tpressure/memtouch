@@ -18,7 +18,8 @@
 static constexpr uint64_t PAGE_SIZE (4096);
 static constexpr int      PATTERN   (0xff);
 
-static constexpr int DEFAULT_STAT_IVAL (1000);
+static constexpr int DEFAULT_STAT_IVAL   (1000);
+static constexpr int DIRTY_RATE_DISABLED (0);
 
 using namespace std;
 
@@ -29,20 +30,23 @@ struct Statistics
     Statistics(Statistics&& o) {
         write_rate.store(o.write_rate.load());
         read_rate.store(o.read_rate.load());
+        dirty_rate.store(o.dirty_rate.load());
     }
 
-    std::atomic<float> read_rate  {0};
-    std::atomic<float> write_rate {0};
+    std::atomic<float> read_rate     {0};
+    std::atomic<float> write_rate    {0};
+    std::atomic<unsigned> dirty_rate {0};
 };
 
 class WorkerThread
 {
 public:
     WorkerThread(unsigned id_, unsigned mem_size_mb_,
-                 unsigned rw_ratio_, bool collect_stats_)
+                 unsigned rw_ratio_, unsigned target_dirty_rate_, bool collect_stats_)
         : id(id_)
         , mem_size_mb(mem_size_mb_)
         , rw_ratio(rw_ratio_)
+        , target_dirty_rate(target_dirty_rate_)
         , collect_stats(collect_stats_)
         , stats()
     {
@@ -98,8 +102,15 @@ public:
         auto time_write = measure_time([&]() {
             for (uint64_t page {pages_to_read}; page < num_pages; ++page) {
                 write_page(page);
+                if (target_dirty_rate and (page % 64) == 0) {
+                   struct timespec time;
+                   time.tv_sec = 0;
+                   time.tv_nsec = current_delay;
+                   nanosleep(&time, nullptr);
+                }
             }
         });
+
 
         if (rw_ratio < 100) {
             stats.read_rate  = (static_cast<float>(pages_to_read  * PAGE_SIZE) / (1024 * 1024)) / static_cast<float>(time_read) * 1000;
@@ -107,6 +118,19 @@ public:
 
         if (rw_ratio > 0) {
             stats.write_rate = (static_cast<float>(pages_to_write * PAGE_SIZE) / (1024 * 1024)) / static_cast<float>(time_write) * 1000;
+        }
+
+        if (target_dirty_rate) {
+            unsigned dirty_rate = pages_to_write / static_cast<uint32_t>(time_write) * 1000;
+            stats.dirty_rate = dirty_rate;
+
+            if (target_dirty_rate) {
+                if (dirty_rate > target_dirty_rate) {
+                    current_delay += 100000;
+                } else if (dirty_rate < target_dirty_rate) {
+                    current_delay -= 100000;
+                }
+            }
         }
     }
 
@@ -152,10 +176,16 @@ public:
         return stats.read_rate.load();
     }
 
+    unsigned dirty_rate() const
+    {
+        return stats.dirty_rate.load();
+    }
+
 private:
     unsigned id;
     unsigned mem_size_mb;
     unsigned rw_ratio;
+    unsigned target_dirty_rate;
 
     bool terminate {false};
     bool collect_stats {false};
@@ -165,6 +195,7 @@ private:
     char read_buffer[PAGE_SIZE];
 
     Statistics stats;
+    unsigned current_delay {0};
 };
 
 class StatisticsThread
@@ -187,17 +218,20 @@ public:
         while (not terminate) {
             float read_rate  {0};
             float write_rate {0};
+            unsigned dirty_rate {0};
 
             for (auto& worker : workers) {
                 read_rate  += worker.read_rate();
                 write_rate += worker.write_rate();
+                dirty_rate += worker.dirty_rate();
             }
 
             if (logging_enabled) {
                 log_file << setprecision(2) << setfill('0')
                          << get_iso8601_time() << " read:"
                          << fixed << read_rate << " write:"
-                         << fixed << write_rate << "\n";
+                         << fixed << write_rate
+                         << " dirty_rate:" << dirty_rate << "\n";
                 log_file.flush();
             }
 
@@ -295,6 +329,11 @@ void setup_argparse(argparse::ArgumentParser& program, int argc, char** argv)
         .help("interval for statistics logging in ms")
         .scan<'u', unsigned>();
 
+    program.add_argument("--target_dirty_rate")
+        .help("maximum dirty rate in pages/s, implies rw_ratio=100")
+        .scan<'u', unsigned>();
+
+
     try {
         program.parse_args(argc, argv);
     }
@@ -318,6 +357,7 @@ int main(int argc, char** argv)
 
     std::string stats_file;
     unsigned stats_ival;
+    unsigned target_dirty_rate;
 
     bool stats_requested {false};
 
@@ -333,6 +373,13 @@ int main(int argc, char** argv)
         stats_ival = DEFAULT_STAT_IVAL;
     }
 
+    try {
+        target_dirty_rate = program.get<unsigned>("--target_dirty_rate");
+        rw_ratio = 100;
+    } catch(const std::exception& err) {
+        target_dirty_rate = DIRTY_RATE_DISABLED;
+    }
+
     if (rw_ratio > 100) {
         printf("Invalid rw_ratio, range is 0 to 100\n");
         return 1;
@@ -345,6 +392,9 @@ int main(int argc, char** argv)
     if (stats_requested) {
         printf("    statistics file    : %s\n", stats_file.data());
         printf("    statistics interval: %u ms\n", stats_ival);
+        if (target_dirty_rate) {
+            printf("    target dirty rate  : %u pages/s\n", target_dirty_rate);
+        }
 
         stat_thread.set_interval(stats_ival);
         stat_thread.set_log_file(stats_file.data());
@@ -354,7 +404,7 @@ int main(int argc, char** argv)
     thread_storage.reserve(num_threads + 1 /* statistics thread */);
 
     for (unsigned num_thread = 0; num_thread < num_threads; num_thread++) {
-        worker_storage.emplace_back(num_thread, thread_mem, rw_ratio, stats_requested);
+        worker_storage.emplace_back(num_thread, thread_mem, rw_ratio, target_dirty_rate, stats_requested);
         thread_storage.emplace_back(std::move(make_unique<thread>(&WorkerThread::run, &worker_storage.back())));
     }
 
