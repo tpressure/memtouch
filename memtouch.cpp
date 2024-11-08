@@ -74,7 +74,7 @@ public:
         func();
         const auto time_end {chrono::system_clock::now()};
 
-        const auto time_needed {chrono::duration_cast<chrono::milliseconds>(time_end - time_start)};
+        const auto time_needed {chrono::duration_cast<chrono::microseconds>(time_end - time_start)};
 
         return time_needed.count();
     }
@@ -102,11 +102,11 @@ public:
         });
 
         if (rw_ratio < 100) {
-            stats.read_rate  = (static_cast<float>(pages_to_read  * PAGE_SIZE) / (1024 * 1024)) / static_cast<float>(time_read) * 1000;
+            stats.read_rate  = (static_cast<float>(pages_to_read  * PAGE_SIZE) / (1024 * 1024)) / static_cast<float>(time_read) * 1000000ul;
         }
 
         if (rw_ratio > 0) {
-            stats.write_rate = (static_cast<float>(pages_to_write * PAGE_SIZE) / (1024 * 1024)) / static_cast<float>(time_write) * 1000;
+            stats.write_rate = (static_cast<float>(pages_to_write * PAGE_SIZE) / (1024 * 1024)) / static_cast<float>(time_write) * 1000000ul;
         }
     }
 
