@@ -33,7 +33,6 @@ Optional arguments:
   --thread_mem   amount of memory a thread touches in MB [required]
   --num_threads  number of worker threads [required]
   --rw_ratio     read/write ratio where 0 means only reads and 100 only writes [required]
-  --random       use random access pattern for (virtual) memory access [default: false]
   --stat_file    filepath where statistics are logged
   --stat_ival    interval for statistics logging in ms
 ```
