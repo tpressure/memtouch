@@ -27,10 +27,12 @@ ninja -C build
 ```bash
 Usage: memtouch [--help] [--version] --thread_mem VAR --num_threads VAR --rw_ratio VAR [--random] [--stat_file VAR] [--stat_ival VAR]
 
+The statistics are given in Mebibyte per second.
+
 Optional arguments:
   -h, --help     shows help message and exits
   -v, --version  prints version information and exits
-  --thread_mem   amount of memory a thread touches in MB [required]
+  --thread_mem   amount of memory a thread touches in MiB [required]
   --num_threads  number of worker threads [required]
   --rw_ratio     read/write ratio where 0 means only reads and 100 only writes [required]
   --stat_file    filepath where statistics are logged
@@ -51,6 +53,7 @@ Running 4 threads touching 256 MB of memory
 
 cat stats.log
 
+# The statistics are given in Mebibyte per second.
 2024-10-29T21:51:03.315+0100 read:16809.49 write:17834.99
 2024-10-29T21:51:03.415+0100 read:15886.61 write:17992.63
 2024-10-29T21:51:03.515+0100 read:16129.03 write:17834.99

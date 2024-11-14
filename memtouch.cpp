@@ -38,10 +38,10 @@ struct Statistics
 class WorkerThread
 {
 public:
-    WorkerThread(unsigned id_, unsigned mem_size_mb_,
+    WorkerThread(unsigned id_, unsigned mem_size_mib_,
                  unsigned rw_ratio_, bool collect_stats_)
         : id(id_)
-        , mem_size_mb(mem_size_mb_)
+        , mem_size_mib(mem_size_mib_)
         , rw_ratio(rw_ratio_)
         , collect_stats(collect_stats_)
         , stats()
@@ -55,7 +55,7 @@ public:
             return;
         }
 
-        uint64_t num_pages {(uint64_t(mem_size_mb) * 1024 * 1024) / PAGE_SIZE};
+        uint64_t num_pages {(uint64_t(mem_size_mib) * 1024 * 1024) / PAGE_SIZE};
 
         // Warmup, write every page
         for (uint64_t page {0}; page < num_pages; ++page) {
@@ -122,14 +122,14 @@ public:
 
     void cleanup_memory()
     {
-        if (munmap(mem_base, uint64_t(mem_size_mb) * 1024 * 1024) != 0) {
+        if (munmap(mem_base, uint64_t(mem_size_mib) * 1024 * 1024) != 0) {
             printf("Unable to unmap memory\n");
         }
     }
 
     bool allocate_memory()
     {
-        mem_base = mmap(NULL, uint64_t(mem_size_mb) * 1024 * 1024,
+        mem_base = mmap(NULL, uint64_t(mem_size_mib) * 1024 * 1024,
                         PROT_READ | PROT_WRITE,
                         MAP_PRIVATE | MAP_ANONYMOUS,
                         -1, 0);
@@ -154,7 +154,7 @@ public:
 
 private:
     unsigned id;
-    unsigned mem_size_mb;
+    unsigned mem_size_mib;
     unsigned rw_ratio;
 
     bool terminate {false};
@@ -275,7 +275,7 @@ void setup_argparse(argparse::ArgumentParser& program, int argc, char** argv)
 {
     program.add_argument("--thread_mem")
         .required()
-        .help("amount of memory a thread touches in MB")
+        .help("amount of memory a thread touches in MiB")
         .scan<'u', unsigned>();
 
     program.add_argument("--num_threads")
@@ -338,8 +338,8 @@ int main(int argc, char** argv)
         return 1;
     }
 
-    printf("Running %u threads touching %u MB of memory\n", num_threads, thread_mem);
-    printf("    memory consumption : %d MB\n", num_threads * thread_mem);
+    printf("Running %u threads touching %u MiB of memory\n", num_threads, thread_mem);
+    printf("    memory consumption : %d MiB\n", num_threads * thread_mem);
     printf("    r/w ratio          : %u\n", rw_ratio);
 
     if (stats_requested) {
