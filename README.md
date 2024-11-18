@@ -27,7 +27,9 @@ ninja -C build
 ```bash
 Usage: memtouch [--help] [--version] --thread_mem VAR --num_threads VAR --rw_ratio VAR [--random] [--stat_file VAR] [--stat_ival VAR]
 
-The statistics are given in Mebibyte per second.
+The measurements are given in Mebibyte per second. This means that increasing or 
+decreasing the interval has no effect on the read/write measurements, but only
+increase the accuracy in terms of time resolution.
 
 Optional arguments:
   -h, --help     shows help message and exits
@@ -42,8 +44,7 @@ Optional arguments:
 ## Example
 
 ```bash
-./memtouch --thread_mem 256 --num_threads 4 --rw_ratio 50 --stat_file ./stats.log --stat_ival 100
-
+$ ./memtouch --thread_mem 256 --num_threads 4 --rw_ratio 50 --stat_file ./stats.log --stat_ival 100
 Running 4 threads touching 256 MB of memory
     memory consumption : 1024 MB
     access pattern     : sequential
@@ -51,10 +52,9 @@ Running 4 threads touching 256 MB of memory
     statistics file    : ./stats.log
     statistics interval: 100 ms
 
-cat stats.log
-
-# The statistics are given in Mebibyte per second.
-2024-10-29T21:51:03.315+0100 read:16809.49 write:17834.99
-2024-10-29T21:51:03.415+0100 read:15886.61 write:17992.63
-2024-10-29T21:51:03.515+0100 read:16129.03 write:17834.99
+# The measurements are given in Mebibyte per second.
+$ cat stats.log
+2024-10-29T21:51:03.315+0100 read_mibps:16809.49 write_mibps:17834.99
+2024-10-29T21:51:03.415+0100 read_mibps:15886.61 write_mibps:17992.63
+2024-10-29T21:51:03.515+0100 read_mibps:16129.03 write_mibps:17834.99
 ```

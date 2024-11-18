@@ -195,8 +195,8 @@ public:
 
             if (logging_enabled) {
                 log_file << setprecision(2) << setfill('0')
-                         << get_iso8601_time() << " read:"
-                         << fixed << read_rate << " write:"
+                         << get_iso8601_time() << " read_mibps:"
+                         << fixed << read_rate << " write_mibps:"
                          << fixed << write_rate << "\n";
                 log_file.flush();
             }
