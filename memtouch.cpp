@@ -305,7 +305,7 @@ void setup_argparse(argparse::ArgumentParser& program, int argc, char** argv)
         .scan<'u', unsigned>();
 
     program.add_argument("--once")
-        .help("touch memory once and the quit memtouch")
+        .help("touch memory once and then quit memtouch")
         .default_value(false)
         .implicit_value(true);
 
@@ -357,7 +357,7 @@ int main(int argc, char** argv)
     printf("    memory consumption : %d MiB\n", num_threads * thread_mem);
     printf("    r/w ratio          : %u\n", rw_ratio);
 
-    if (stats_requested) {
+    if (stats_requested and not once) {
         printf("    statistics file    : %s\n", stats_file.data());
         printf("    statistics interval: %u ms\n", stats_ival);
 
@@ -373,7 +373,7 @@ int main(int argc, char** argv)
         thread_storage.emplace_back(std::move(make_unique<thread>(&WorkerThread::run, &worker_storage.back())));
     }
 
-    if (stats_requested) {
+    if (stats_requested and not once) {
         thread_storage.emplace_back(std::move(make_unique<thread>(&StatisticsThread::run, &stat_thread)));
     }
 
