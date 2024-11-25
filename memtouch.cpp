@@ -239,10 +239,17 @@ public:
         return s.str();
     }
 
-    void set_log_file(string file_path)
+    bool set_log_file(string file_path)
     {
         log_file.open(file_path);
+
+        if (not log_file.is_open()) {
+            return false;
+        }
+
         logging_enabled = true;
+
+        return true;
     }
 
 private:
@@ -362,7 +369,11 @@ int main(int argc, char** argv)
         printf("    statistics interval: %u ms\n", stats_ival);
 
         stat_thread.set_interval(stats_ival);
-        stat_thread.set_log_file(stats_file.data());
+        bool success {stat_thread.set_log_file(stats_file.data())};
+        if (not success) {
+            printf("Unable to open statistics file\n");
+            return 1;
+        }
     }
 
     worker_storage.reserve(num_threads);
