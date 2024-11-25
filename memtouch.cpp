@@ -20,8 +20,6 @@ static constexpr int      PATTERN   (0xff);
 
 static constexpr int DEFAULT_STAT_IVAL (1000);
 
-static std::atomic<uint64_t> warmup_complete_counter {0};
-
 using namespace std;
 
 struct Statistics
@@ -40,10 +38,10 @@ struct Statistics
 class WorkerThread
 {
 public:
-    WorkerThread(unsigned id_, uint64_t num_threads_, unsigned mem_size_mib_,
+    WorkerThread(unsigned id_, bool run_once_, unsigned mem_size_mib_,
                  unsigned rw_ratio_, bool collect_stats_)
         : id(id_)
-        , num_threads(num_threads_)
+        , run_once(run_once_)
         , mem_size_mib(mem_size_mib_)
         , rw_ratio(rw_ratio_)
         , collect_stats(collect_stats_)
@@ -68,9 +66,8 @@ public:
             write_page(page);
         }
 
-        warmup_complete_counter++;
-        if (warmup_complete_counter == num_threads) {
-            printf("Warmup completed\n");
+        if (run_once) {
+            kill();
         }
 
         while(not terminate) {
@@ -165,7 +162,7 @@ public:
 
 private:
     unsigned id;
-    uint64_t num_threads;
+    bool run_once;
     unsigned mem_size_mib;
     unsigned rw_ratio;
 
@@ -307,6 +304,11 @@ void setup_argparse(argparse::ArgumentParser& program, int argc, char** argv)
         .help("interval for statistics logging in ms")
         .scan<'u', unsigned>();
 
+    program.add_argument("--once")
+        .help("touch memory once and the quit memtouch")
+        .default_value(false)
+        .implicit_value(true);
+
     try {
         program.parse_args(argc, argv);
     }
@@ -327,6 +329,7 @@ int main(int argc, char** argv)
     auto thread_mem    = program.get<unsigned>("--thread_mem");
     auto num_threads   = program.get<unsigned>("--num_threads");
     auto rw_ratio      = program.get<unsigned>("--rw_ratio");
+    auto once          = program.get<bool>("--once");
 
     std::string stats_file;
     unsigned stats_ival;
@@ -366,7 +369,7 @@ int main(int argc, char** argv)
     thread_storage.reserve(num_threads + 1 /* statistics thread */);
 
     for (unsigned num_thread = 0; num_thread < num_threads; num_thread++) {
-        worker_storage.emplace_back(num_thread, num_threads, thread_mem, rw_ratio, stats_requested);
+        worker_storage.emplace_back(num_thread, once, thread_mem, rw_ratio, stats_requested);
         thread_storage.emplace_back(std::move(make_unique<thread>(&WorkerThread::run, &worker_storage.back())));
     }
 
