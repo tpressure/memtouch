@@ -20,6 +20,8 @@ static constexpr int      PATTERN   (0xff);
 
 static constexpr int DEFAULT_STAT_IVAL (1000);
 
+static std::atomic<uint64_t> warmup_complete_counter {0};
+
 using namespace std;
 
 struct Statistics
@@ -38,9 +40,10 @@ struct Statistics
 class WorkerThread
 {
 public:
-    WorkerThread(unsigned id_, unsigned mem_size_mib_,
+    WorkerThread(unsigned id_, uint64_t num_threads_, unsigned mem_size_mib_,
                  unsigned rw_ratio_, bool collect_stats_)
         : id(id_)
+        , num_threads(num_threads_)
         , mem_size_mib(mem_size_mib_)
         , rw_ratio(rw_ratio_)
         , collect_stats(collect_stats_)
@@ -63,6 +66,11 @@ public:
                 break;
             }
             write_page(page);
+        }
+
+        warmup_complete_counter++;
+        if (warmup_complete_counter == num_threads) {
+            printf("Warmup completed\n");
         }
 
         while(not terminate) {
@@ -157,6 +165,7 @@ public:
 
 private:
     unsigned id;
+    uint64_t num_threads;
     unsigned mem_size_mib;
     unsigned rw_ratio;
 
@@ -357,7 +366,7 @@ int main(int argc, char** argv)
     thread_storage.reserve(num_threads + 1 /* statistics thread */);
 
     for (unsigned num_thread = 0; num_thread < num_threads; num_thread++) {
-        worker_storage.emplace_back(num_thread, thread_mem, rw_ratio, stats_requested);
+        worker_storage.emplace_back(num_thread, num_threads, thread_mem, rw_ratio, stats_requested);
         thread_storage.emplace_back(std::move(make_unique<thread>(&WorkerThread::run, &worker_storage.back())));
     }
 
