@@ -59,6 +59,9 @@ public:
 
         // Warmup, write every page
         for (uint64_t page {0}; page < num_pages; ++page) {
+            if (terminate) {
+                break;
+            }
             write_page(page);
         }
 
