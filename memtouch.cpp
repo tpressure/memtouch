@@ -8,6 +8,7 @@
 #include <thread>
 #include <vector>
 
+#include <assert.h>
 #include <signal.h>
 #include <sys/mman.h>
 
@@ -49,12 +50,19 @@ public:
     {
     }
 
-    void run()
+    bool pre_run()
     {
         if (not allocate_memory()) {
-            printf("Unable to allocate memory\n");
-            return;
+            printf("Worker %d: Unable to allocate memory\n", id);
+            return false;
         }
+
+        return true;
+    }
+
+    void run()
+    {
+        assert(mem_base != nullptr);
 
         uint64_t num_pages {(uint64_t(mem_size_mib) * 1024 * 1024) / PAGE_SIZE};
 
@@ -381,7 +389,14 @@ int main(int argc, char** argv)
 
     for (unsigned num_thread = 0; num_thread < num_threads; num_thread++) {
         worker_storage.emplace_back(num_thread, once, thread_mem, rw_ratio, stats_requested);
-        thread_storage.emplace_back(std::move(make_unique<thread>(&WorkerThread::run, &worker_storage.back())));
+        if (not worker_storage.back().pre_run()) {
+            worker_storage.clear();
+            return 1;
+        }
+    }
+
+    for (unsigned num_thread = 0; num_thread < num_threads; num_thread++) {
+        thread_storage.emplace_back(std::move(make_unique<thread>(&WorkerThread::run, &worker_storage.at(num_thread))));
     }
 
     if (stats_requested and not once) {
