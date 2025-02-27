@@ -85,7 +85,7 @@ public:
         cleanup_memory();
     }
 
-    int64_t measure_time(std::function<void()> func) {
+    int64_t measure_time_us(std::function<void()> func) {
         const auto time_start {chrono::system_clock::now()};
         func();
         const auto time_end {chrono::system_clock::now()};
@@ -105,24 +105,30 @@ public:
             pages_to_read  = num_pages - pages_to_write;
         }
 
-        auto time_read = measure_time([&]() {
+        auto time_read_us = measure_time_us([&]() {
             for (uint64_t page {0}; page < pages_to_read; ++page) {
                 read_page(page, &read_buffer[0]);
             }
         });
 
-        auto time_write = measure_time([&]() {
+        auto time_write_us = measure_time_us([&]() {
             for (uint64_t page {pages_to_read}; page < num_pages; ++page) {
                 write_page(page);
             }
         });
 
         if (rw_ratio < 100) {
-            stats.read_rate  = (static_cast<float>(pages_to_read  * PAGE_SIZE) / (1024 * 1024)) / static_cast<float>(time_read) * 1000000ul;
+            auto bytes = static_cast<float>(pages_to_read * PAGE_SIZE);
+            auto mebi_bytes = bytes / 1024.0f / 1024.0f;
+            auto seconds = static_cast<float>(time_read_us) / 1000000.0f;
+            stats.read_rate = mebi_bytes / seconds;
         }
 
         if (rw_ratio > 0) {
-            stats.write_rate = (static_cast<float>(pages_to_write * PAGE_SIZE) / (1024 * 1024)) / static_cast<float>(time_write) * 1000000ul;
+            auto bytes = static_cast<float>(pages_to_write * PAGE_SIZE);
+            auto mebi_bytes = bytes / 1024.0f / 1024.0f;
+            auto seconds = static_cast<float>(time_write_us) / 1000000.0f;
+            stats.write_rate = mebi_bytes / seconds;
         }
     }
 
