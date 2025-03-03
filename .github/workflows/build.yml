@@ -29,7 +29,6 @@ jobs:
         with:
           submodules: 'true'
       - uses: cachix/install-nix-action@v30
-      - uses: DeterminateSystems/magic-nix-cache-action@main
       - name: build
         run: nix develop -i --command bash -c "meson setup build && ninja -C build"
       - name: test
@@ -40,7 +39,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: cachix/install-nix-action@v30
-      - uses: DeterminateSystems/magic-nix-cache-action@main
       - name: nix build
         run: nix build .
       - name: nix test
