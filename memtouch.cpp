@@ -40,12 +40,11 @@ class WorkerThread
 {
 public:
     WorkerThread(unsigned id_, bool run_once_, unsigned mem_size_mib_,
-                 unsigned rw_ratio_, bool collect_stats_)
+                 unsigned rw_ratio_)
         : id(id_)
         , run_once(run_once_)
         , mem_size_mib(mem_size_mib_)
         , rw_ratio(rw_ratio_)
-        , collect_stats(collect_stats_)
         , stats()
     {
     }
@@ -181,7 +180,6 @@ private:
     unsigned rw_ratio;
 
     bool terminate {false};
-    bool collect_stats {false};
 
     void* mem_base {nullptr};
 
@@ -394,7 +392,7 @@ int main(int argc, char** argv)
     thread_storage.reserve(num_threads + 1 /* statistics thread */);
 
     for (unsigned num_thread = 0; num_thread < num_threads; num_thread++) {
-        worker_storage.emplace_back(num_thread, once, thread_mem, rw_ratio, stats_requested);
+        worker_storage.emplace_back(num_thread, once, thread_mem, rw_ratio);
         if (not worker_storage.back().pre_run()) {
             worker_storage.clear();
             return 1;
