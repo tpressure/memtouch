@@ -32,13 +32,14 @@ decreasing the interval has no effect on the read/write measurements, but only
 increase the accuracy in terms of time resolution.
 
 Optional arguments:
-  -h, --help     shows help message and exits
-  -v, --version  prints version information and exits
-  --thread_mem   amount of memory a thread touches in MiB [required]
-  --num_threads  number of worker threads [required]
-  --rw_ratio     read/write ratio where 0 means only reads and 100 only writes [required]
-  --stat_file    filepath where statistics are logged
-  --stat_ival    interval for statistics logging in ms
+  -h, --help      shows help message and exits
+  -v, --version   prints version information and exits
+  --thread_mem    amount of memory a thread touches in MiB [required]
+  --num_threads   number of worker threads [required]
+  --rw_ratio      read/write ratio where 0 means only reads and 100 only writes [required]
+  --stat_file     filepath where statistics are logged
+  --stat_ival     interval for statistics logging in ms
+  --page_log_ival log statistics after a specific number of pages have been read/written
 ```
 
 ## Example
@@ -58,3 +59,8 @@ $ cat stats.log
 2024-10-29T21:51:03.415+0100 read_mibps:15886.61 write_mibps:17992.63
 2024-10-29T21:51:03.515+0100 read_mibps:16129.03 write_mibps:17834.99
 ```
+
+## Hints
+
+Ensure that `--thread_mem` is significantly higher than your L3 cache, if you
+want to test the main memory. Otherwise, you are testing the caches.

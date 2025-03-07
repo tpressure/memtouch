@@ -1,5 +1,6 @@
 #include <argparse.hpp>
 
+#include <algorithm>
 #include <chrono>
 #include <cstring>
 #include <fstream>
@@ -40,12 +41,12 @@ class WorkerThread
 {
 public:
     WorkerThread(unsigned id_, bool run_once_, unsigned mem_size_mib_,
-                 unsigned rw_ratio_, bool collect_stats_)
+                 unsigned rw_ratio_, uint64_t page_log_ival_)
         : id(id_)
         , run_once(run_once_)
         , mem_size_mib(mem_size_mib_)
         , rw_ratio(rw_ratio_)
-        , collect_stats(collect_stats_)
+        , page_log_ival(page_log_ival_)
         , stats()
     {
     }
@@ -85,50 +86,80 @@ public:
         cleanup_memory();
     }
 
-    int64_t measure_time_us(std::function<void()> func) {
+    int64_t measure_time_ns(std::function<void()> func) {
         const auto time_start {chrono::system_clock::now()};
         func();
         const auto time_end {chrono::system_clock::now()};
+        const auto time_needed {chrono::duration_cast<chrono::nanoseconds>(time_end - time_start)};
+        auto ns = time_needed.count();
 
-        const auto time_needed {chrono::duration_cast<chrono::microseconds>(time_end - time_start)};
-
-        return time_needed.count();
+        // To prevent divide by zero errors (causing float infinity), we always
+        // report a non-null number. This is only the case for very small sample
+        // sizes of a few pages.
+        if (ns == 0) {
+            ns = 1;
+        }
+        return ns;
     }
 
     void run_loop(uint64_t num_pages)
     {
-        uint64_t pages_to_read  {num_pages};
-        uint64_t pages_to_write {0};
+        uint64_t total_pages_to_read  {num_pages};
+        uint64_t total_pages_to_write {0};
+
+        uint64_t pages_read  {0};
+        uint64_t pages_written {0};
 
         if (rw_ratio) {
-            pages_to_write = (num_pages * rw_ratio) / 100;
-            pages_to_read  = num_pages - pages_to_write;
+            total_pages_to_write = (num_pages * rw_ratio) / 100;
+            total_pages_to_read  = num_pages - total_pages_to_write;
         }
 
-        auto time_read_us = measure_time_us([&]() {
-            for (uint64_t page {0}; page < pages_to_read; ++page) {
-                read_page(page, &read_buffer[0]);
+        // Ensure that `page_log_ival` is not more than `pages_to_*`
+        auto pages_to_read_per_iter = std::min(page_log_ival, total_pages_to_read);
+        auto pages_to_write_per_iter = std::min(page_log_ival, total_pages_to_write);
+
+        // We touch all pages but we report the progress every %n pages
+        while ( (pages_read + pages_written) < num_pages) {
+            auto remaining_pages_to_read = total_pages_to_read - pages_read;
+            auto remaining_pages_to_write = total_pages_to_write - pages_written;
+
+            // Effective pages to read in this iteration
+            auto pages_to_read_eff = std::min(pages_to_read_per_iter, remaining_pages_to_read);
+            // Effective pages to write in this iteration
+            auto pages_to_write_eff = std::min(pages_to_write_per_iter, remaining_pages_to_write);
+
+            auto time_read_ns = measure_time_ns([&]() {
+                for (uint64_t n {0}; n < pages_to_read_eff; ++n) {
+                    auto page = n + pages_read + pages_written;
+                    read_page(page, &read_buffer[0]);
+                }
+            });
+            pages_read += pages_to_read_eff;
+
+            auto time_write_ns = measure_time_ns([&]() {
+                for (uint64_t n {0}; n < pages_to_write_eff; ++n) {
+                    auto page = n + pages_read + pages_written;
+                    write_page(page);
+                }
+            });
+            pages_written += pages_to_write_eff;
+
+            /* if we had reads */
+            if (rw_ratio < 100 and pages_to_read_eff > 0) {
+                auto bytes = static_cast<float>(pages_to_read_eff * PAGE_SIZE);
+                auto mebi_bytes = bytes / 1024.0f / 1024.0f;
+                auto seconds = static_cast<float>(time_read_ns) / 1000000000.0f;
+                stats.read_rate = mebi_bytes / seconds;
             }
-        });
 
-        auto time_write_us = measure_time_us([&]() {
-            for (uint64_t page {pages_to_read}; page < num_pages; ++page) {
-                write_page(page);
+            /* if we had writes */
+            if (rw_ratio > 0 and pages_to_write_eff > 0) {
+                auto bytes = static_cast<float>(pages_to_write_eff * PAGE_SIZE);
+                auto mebi_bytes = bytes / 1024.0f / 1024.0f;
+                auto seconds = static_cast<float>(time_write_ns) / 1000000000.0f;
+                stats.write_rate = mebi_bytes / seconds;
             }
-        });
-
-        if (rw_ratio < 100) {
-            auto bytes = static_cast<float>(pages_to_read * PAGE_SIZE);
-            auto mebi_bytes = bytes / 1024.0f / 1024.0f;
-            auto seconds = static_cast<float>(time_read_us) / 1000000.0f;
-            stats.read_rate = mebi_bytes / seconds;
-        }
-
-        if (rw_ratio > 0) {
-            auto bytes = static_cast<float>(pages_to_write * PAGE_SIZE);
-            auto mebi_bytes = bytes / 1024.0f / 1024.0f;
-            auto seconds = static_cast<float>(time_write_us) / 1000000.0f;
-            stats.write_rate = mebi_bytes / seconds;
         }
     }
 
@@ -179,9 +210,9 @@ private:
     bool run_once;
     unsigned mem_size_mib;
     unsigned rw_ratio;
+    uint64_t page_log_ival;
 
     bool terminate {false};
-    bool collect_stats {false};
 
     void* mem_base {nullptr};
 
@@ -325,6 +356,10 @@ void setup_argparse(argparse::ArgumentParser& program, int argc, char** argv)
         .help("interval for statistics logging in ms")
         .scan<'u', unsigned>();
 
+    program.add_argument("--page_log_ival")
+        .help("log statistics after a specific number of pages have been read/written")
+        .scan<'u', uint64_t>();
+
     program.add_argument("--once")
         .help("touch memory once and then quit memtouch")
         .default_value(false)
@@ -354,6 +389,7 @@ int main(int argc, char** argv)
 
     std::string stats_file;
     unsigned stats_ival;
+    uint64_t page_log_ival;
 
     bool stats_requested {false};
 
@@ -369,6 +405,13 @@ int main(int argc, char** argv)
         stats_ival = DEFAULT_STAT_IVAL;
     }
 
+    try {
+        page_log_ival = program.get<uint64_t>("--page_log_ival");
+    } catch (const std::exception& err) {
+        uint64_t num_pages {(uint64_t(thread_mem) * 1024 * 1024) / PAGE_SIZE};
+        page_log_ival = num_pages;
+    }
+
     if (rw_ratio > 100) {
         printf("Invalid rw_ratio, range is 0 to 100\n");
         return 1;
@@ -377,6 +420,7 @@ int main(int argc, char** argv)
     printf("Running %u threads touching %u MiB of memory\n", num_threads, thread_mem);
     printf("    memory consumption : %d MiB\n", num_threads * thread_mem);
     printf("    r/w ratio          : %u\n", rw_ratio);
+    printf("    page log interval  : %lu\n", page_log_ival);
 
     if (stats_requested and not once) {
         printf("    statistics file    : %s\n", stats_file.data());
@@ -394,7 +438,7 @@ int main(int argc, char** argv)
     thread_storage.reserve(num_threads + 1 /* statistics thread */);
 
     for (unsigned num_thread = 0; num_thread < num_threads; num_thread++) {
-        worker_storage.emplace_back(num_thread, once, thread_mem, rw_ratio, stats_requested);
+        worker_storage.emplace_back(num_thread, once, thread_mem, rw_ratio, page_log_ival);
         if (not worker_storage.back().pre_run()) {
             worker_storage.clear();
             return 1;
